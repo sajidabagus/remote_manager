@@ -1,0 +1,1 @@
+ALTER TABLE tasks ADD COLUMN result VARCHAR(255) NULL AFTER status;

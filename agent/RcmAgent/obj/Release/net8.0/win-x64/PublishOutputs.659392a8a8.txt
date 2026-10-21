@@ -1,0 +1,3 @@
+C:\xampp\htdocs\remote_manager\agent\RcmAgent\publish\appsettings.json
+C:\xampp\htdocs\remote_manager\agent\RcmAgent\publish\RcmAgent.pdb
+C:\xampp\htdocs\remote_manager\agent\RcmAgent\publish\RcmAgent.exe
