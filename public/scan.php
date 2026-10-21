@@ -31,7 +31,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   }
 }
 $job=(int)($_GET['job']??0);
-page_header('Scan Jaringan','scan'); ?>
+page_header('Scan Jaringan','scan','Temukan komputer di jaringan lab dan daftarkan.'); ?>
 <div class="card mb-3"><div class="card-body"><form method="post" class="row g-2 align-items-end"><?=csrf_field()?><input type="hidden" name="action" value="start">
 <div class="col-md-4"><label class="form-label">Rentang IP (CIDR)</label><input name="cidr" class="form-control" value="192.168.1.0/24"></div>
 <div class="col-auto"><button class="btn btn-primary"><i class="bi bi-wifi"></i> Mulai Scan</button></div></form>

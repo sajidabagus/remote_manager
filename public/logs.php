@@ -17,13 +17,13 @@ if(isset($_GET['csv'])){
 $s=db()->prepare("SELECT COUNT(*) FROM activity_logs WHERE $W"); $s->execute($p); $n=(int)$s->fetchColumn(); $pages=max(1,(int)ceil($n/$per)); $pg=min($pg,$pages);
 $s=db()->prepare("SELECT * FROM activity_logs WHERE $W ORDER BY id DESC LIMIT $per OFFSET ".(($pg-1)*$per)); $s->execute($p); $rows=$s->fetchAll();
 $qs=fn($x)=>h(http_build_query(array_merge(['from'=>$from,'to'=>$to,'q'=>$q,'st'=>$st],$x)));
-page_header('Riwayat & Log','logs'); ?>
+page_header('Riwayat & Log','logs','Semua aktivitas admin, jadwal, dan client.'); ?>
 <div class="card"><div class="card-body"><form class="row g-2 mb-3"><div class="col-md-2"><input type="date" name="from" value="<?=h($from)?>" class="form-control"></div><div class="col-md-2"><input type="date" name="to" value="<?=h($to)?>" class="form-control"></div>
 <div class="col-md-3"><input name="q" value="<?=h($q)?>" class="form-control" placeholder="Cari user, aksi, target, keterangan"></div>
 <div class="col-md-2"><select name="st" class="form-select"><option value="">Semua status</option><option<?=$st==='Sukses'?' selected':''?>>Sukses</option><option<?=$st==='Gagal'?' selected':''?>>Gagal</option></select></div>
 <div class="col-md-3 d-flex gap-2"><button class="btn btn-primary">Filter</button><a class="btn btn-outline-success" href="?<?=$qs(['csv'=>1])?>">Ekspor CSV</a></div></form>
 <table class="table table-sm align-middle"><thead><tr><th>Waktu</th><th>User</th><th>Aksi</th><th>Target</th><th>Status</th><th>Keterangan</th></tr></thead><tbody>
-<?php foreach($rows as $r) echo '<tr><td class="text-nowrap">'.h(date('d M H:i:s',strtotime($r['created_at']))).'</td><td>'.h($r['user']).'</td><td>'.h($r['action']).'</td><td>'.h($r['target']).'</td><td><span class="badge text-bg-'.($r['status']==='Sukses'?'success':'danger').'">'.h($r['status']).'</span></td><td class="text-muted small">'.h($r['note']).'</td></tr>';
+<?php foreach($rows as $r) echo '<tr><td class="text-nowrap">'.h(date('d M H:i:s',strtotime($r['created_at']))).'</td><td>'.h($r['user']).'</td><td>'.h($r['action']).'</td><td>'.h($r['target']).'</td><td><span class="badge-s '.($r['status']==='Sukses'?'b-ok':'b-fail').'">'.h($r['status']).'</span></td><td class="text-muted small">'.h($r['note']).'</td></tr>';
 if(!$rows) echo '<tr><td colspan="6" class="text-center text-muted py-4">Tidak ada log.</td></tr>'; ?></tbody></table>
 <div class="d-flex justify-content-between align-items-center"><small class="text-muted"><?=$n?> entri</small><ul class="pagination pagination-sm mb-0">
 <?php foreach(array_unique([1,max(1,$pg-1),$pg,min($pages,$pg+1),$pages]) as $i) echo '<li class="page-item'.($i==$pg?' active':'').'"><a class="page-link" href="?'.$qs(['p'=>$i]).'">'.$i.'</a></li>'; ?></ul>

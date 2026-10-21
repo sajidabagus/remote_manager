@@ -13,16 +13,19 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
 }
 $rows=db()->query('SELECT * FROM programs ORDER BY type,name')->fetchAll();
 $btn=fn($act,$id,$cls,$lbl)=>'<form method="post" class="d-inline">'.csrf_field().'<input type="hidden" name="action" value="'.$act.'"><input type="hidden" name="id" value="'.$id.'"><button class="btn btn-sm btn-outline-'.$cls.'">'.$lbl.'</button></form>';
-page_header('Program & Aplikasi','programs'); ?>
-<div class="alert alert-info py-2">Hanya program berstatus <b>Diizinkan</b> yang bisa dijalankan dari menu Kontrol. Admin tidak bisa mengetik path bebas saat mengirim perintah.</div>
-<div class="card mb-3"><div class="card-body"><table class="table align-middle"><thead><tr><th>Nama</th><th>Jenis</th><th>Path / URL</th><th>Parameter / Browser</th><th>Status</th><th></th></tr></thead><tbody>
-<?php foreach($rows as $r): ?><tr><td class="fw-semibold"><?=h($r['name'])?></td><td><?=$r['type']==='url'?'URL':'Aplikasi'?></td><td class="small"><?=h($r['path'])?></td><td class="small"><?=h($r['parameter'])?></td>
-<td><?=$r['allowed']?'<span class="badge text-bg-success">Diizinkan</span>':'<span class="badge text-bg-secondary">Nonaktif</span>'?></td><td class="text-nowrap"><?=$btn('toggle',$r['id'],'secondary',$r['allowed']?'Nonaktifkan':'Aktifkan')?> <?=$btn('del',$r['id'],'danger','<i class="bi bi-trash"></i>')?></td></tr>
-<?php endforeach; ?></tbody></table></div></div>
-<div class="card"><div class="card-body"><h5>Tambah program</h5><form method="post" class="row g-2"><?=csrf_field()?><input type="hidden" name="action" value="add">
+page_header('Kelola Program & Aplikasi','programs','Daftar aplikasi dan URL yang dapat dijalankan dari remote.'); $tab=($_GET['tab']??'app')==='url'?'url':'app'; ?>
+<div class="card mb-3"><div class="card-body"><div class="d-flex justify-content-between align-items-center mb-3">
+<ul class="nav nav-tabs border-0"><li class="nav-item"><a class="nav-link<?=$tab==='app'?' active':''?>" href="?tab=app">Aplikasi Windows</a></li><li class="nav-item"><a class="nav-link<?=$tab==='url'?' active':''?>" href="?tab=url">URL / Browser</a></li></ul>
+<a href="#tambah" class="btn btn-primary btn-sm"><i class="bi bi-plus"></i> Tambah <?=$tab==='url'?'URL':'Aplikasi'?></a></div>
+<div class="tip mb-3">Hanya program berstatus <b>Diizinkan</b> yang bisa dijalankan dari menu Remote Control. Admin tidak bisa mengetik path bebas saat mengirim perintah.</div>
+<table class="table align-middle"><thead><tr><th>No</th><th>Nama <?=$tab==='url'?'URL':'Aplikasi'?></th><th><?=$tab==='url'?'URL':'Path'?></th><th><?=$tab==='url'?'Browser':'Parameter'?></th><th>Status</th><th>Aksi</th></tr></thead><tbody>
+<?php $no=0; foreach($rows as $r): if($r['type']!==$tab) continue; $no++; ?><tr><td><?=$no?></td><td class="fw-semibold"><i class="bi <?=$tab==='url'?'bi-globe':'bi-window'?> text-primary me-1"></i><?=h($r['name'])?></td><td class="small"><?=h($r['path'])?></td><td class="small"><?=h($r['parameter']?:'-')?></td>
+<td><?=$r['allowed']?'<span class="badge-s b-ok">Diizinkan</span>':'<span class="badge-s b-idle">Nonaktif</span>'?></td><td class="text-nowrap"><?=$btn('toggle',$r['id'],'secondary',$r['allowed']?'Nonaktifkan':'Aktifkan')?> <?=$btn('del',$r['id'],'danger','<i class="bi bi-trash"></i>')?></td></tr>
+<?php endforeach; if(!$no) echo '<tr><td colspan="6" class="text-center text-muted py-4">Belum ada data.</td></tr>'; ?></tbody></table></div></div>
+<div class="card" id="tambah"><div class="card-body"><div class="card-title mb-2">Tambah program</div><form method="post" class="row g-2"><?=csrf_field()?><input type="hidden" name="action" value="add">
 <div class="col-md-2"><input name="name" class="form-control" placeholder="Nama" required></div>
-<div class="col-md-2"><select name="type" class="form-select"><option value="app">Aplikasi Windows</option><option value="url">URL / Browser</option></select></div>
+<div class="col-md-2"><select name="type" class="form-select"><option value="app"<?=$tab==='app'?' selected':''?>>Aplikasi Windows</option><option value="url"<?=$tab==='url'?' selected':''?>>URL / Browser</option></select></div>
 <div class="col-md-4"><input name="path" class="form-control" placeholder="C:\Program Files\...\app.exe atau https://..." required></div>
 <div class="col-md-2"><input name="parameter" class="form-control" placeholder="Argumen / chrome|edge"></div>
-<div class="col-md-1 pt-2"><label><input type="checkbox" name="allowed" checked> Izinkan</label></div><div class="col-md-1"><button class="btn btn-primary w-100">Tambah</button></div></form></div></div>
+<div class="col-md-1 pt-2"><label><input class="form-check-input" type="checkbox" name="allowed" checked> Izinkan</label></div><div class="col-md-1"><button class="btn btn-primary w-100">Tambah</button></div></form></div></div>
 <?php page_footer();

@@ -11,7 +11,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   usleep(500000); $err='Username atau password salah.'; log_activity('Login gagal',substr($_POST['username']??'',0,50),'Gagal','','anon');
 }
 ?><!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Login - RCM</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"></head>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link href="assets/rcm.css" rel="stylesheet"></head>
 <body style="background:#0b1f4d" class="d-flex align-items-center vh-100"><div class="card mx-auto shadow" style="width:360px"><div class="card-body p-4">
 <h4 class="fw-bold">Remote Client Manager</h4><p class="text-muted">Masuk sebagai admin</p>
 <?php if($err) echo '<div class="alert alert-danger py-2">'.h($err).'</div>'; ?>

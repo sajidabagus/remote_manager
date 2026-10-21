@@ -1,0 +1,485 @@
+From 1564c4bde109a374bcfac27cb6c1c58949c0e871 Mon Sep 17 00:00:00 2001
+From: Viktor <viktor+ws.624ccd41e61c@users.noreply.github.com>
+Date: Wed, 21 Oct 2026 09:42:19 +0000
+Subject: [PATCH] UI: tema baru sesuai desain (sidebar navy, header, dashboard
+ v2, launcher, program tab, jadwal toggle)
+
+---
+ includes/layout.php   |  38 ++++++++------
+ public/assets/rcm.css |  47 +++++++++++++++++
+ public/clients.php    |   6 +--
+ public/control.php    |  52 ++++++++++++-------
+ public/index.php      | 114 +++++++++++++++++++++++++++++++++---------
+ public/login.php      |   2 +-
+ public/logs.php       |   4 +-
+ public/programs.php   |  21 ++++----
+ public/scan.php       |   2 +-
+ public/schedules.php  |  13 ++---
+ public/settings.php   |   6 +--
+ 11 files changed, 222 insertions(+), 83 deletions(-)
+ create mode 100644 public/assets/rcm.css
+
+diff --git a/includes/layout.php b/includes/layout.php
+index 183f69e..783a69a 100644
+--- a/includes/layout.php
++++ b/includes/layout.php
+@@ -1,22 +1,32 @@
+ <?php
+-function page_header(string $title,string $active=''){
+-  $nav=['index'=>['Dashboard','bi-house-door-fill','index.php'],'clients'=>['Kelola Client','bi-pc-display','clients.php'],'control'=>['Kontrol Client','bi-sliders','control.php'],'programs'=>['Program & Aplikasi','bi-grid','programs.php'],'schedules'=>['Jadwal Otomatis','bi-calendar-check','schedules.php'],'logs'=>['Riwayat & Log','bi-journal-text','logs.php'],
++// Layout bersama: sidebar navy + header (tanggal, jam berjalan, notifikasi, profil). Gaya di public/assets/rcm.css
++function page_header(string $title,string $active='',string $sub=''){
++  $nav=['index'=>['Dashboard','bi-house-door-fill','index.php'],'clients'=>['Kelola Client','bi-pc-display','clients.php'],
++        'programs'=>['Program & Aplikasi','bi-grid','programs.php'],'schedules'=>['Jadwal Otomatis','bi-calendar-check','schedules.php'],
++        'control'=>['Remote Control','bi-display','control.php'],'lock'=>['Kunci Perangkat','bi-lock','index.php#kunci'],
++        'msg'=>['Pesan ke Client','bi-envelope','index.php#pesan'],'logs'=>['Riwayat & Log','bi-journal-text','logs.php'],
+         'scan'=>['Scan Jaringan','bi-wifi','scan.php'],'settings'=>['Pengaturan','bi-gear','settings.php']];
++  $pending=0; try{ $pending=(int)db()->query("SELECT COUNT(*) FROM clients WHERE status='pending'")->fetchColumn(); }catch(Throwable $e){}
++  $srv=$_SERVER['SERVER_ADDR']??'127.0.0.1'; $user=$_SESSION['admin']['username']??'admin'; $role=$_SESSION['admin']['role']??'admin';
++  $hari=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][(int)date('w')];
++  $bulan=['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'][(int)date('n')];
+ ?><!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+ <title><?=h($title)?> - RCM</title>
+ <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+ <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+-<style>
+-body{background:#f4f6fb}.side{width:240px;min-height:100vh;background:#0b1f4d;position:fixed;top:0;left:0}
+-.side a{color:#cfd8f3;text-decoration:none;display:block;padding:.65rem 1rem;border-radius:.5rem;margin:.2rem .75rem}
+-.side a:hover{background:#17306b}.side a.active{background:#1d6ff2;color:#fff}.main{margin-left:240px;padding:1.25rem 1.5rem}
+-.stat,.card{border-radius:.9rem;border-color:#e3e8f5}
+-@media(max-width:768px){.side{position:static;width:100%;min-height:0}.main{margin-left:0}}
+-</style></head><body>
+-<div class="side"><div class="p-3 text-white"><div class="fw-bold fs-5"><i class="bi bi-display"></i> Remote Client Manager</div><small class="text-white-50">Laboratorium Komputer</small></div>
+-<?php foreach($nav as $k=>$n): ?><a class="<?=$k===$active?'active':''?>" href="<?=$n[2]?>"><i class="bi <?=$n[1]?> me-2"></i><?=$n[0]?></a><?php endforeach; ?>
+-<a href="logout.php" class="mt-4"><i class="bi bi-box-arrow-left me-2"></i>Keluar (<?=h($_SESSION['admin']['username']??'')?>)</a></div>
+-<div class="main"><h3 class="fw-bold mb-3"><?=h($title)?></h3>
++<link href="assets/rcm.css" rel="stylesheet"></head><body>
++<aside class="side"><div class="brand"><div class="logo"><i class="bi bi-display"></i></div><div><b>Remote Client Manager</b><small>Laboratorium Komputer</small></div></div>
++<nav><?php foreach($nav as $k=>$n): ?><a class="<?=$k===$active?'active':''?>" href="<?=$n[2]?>"><i class="bi <?=$n[1]?>"></i><?=$n[0]?><i class="bi bi-chevron-right chev"></i></a><?php endforeach; ?></nav>
++<div class="srv"><span class="dot"></span><b>Server Online</b><div class="ms-3"><?=h($srv)?><br><span class="text-white-50">v<?=h(defined('APP_VERSION')?APP_VERSION:'1.0.0')?></span></div></div></aside>
++<div class="main"><header class="topbar"><i class="bi bi-list fs-4 d-lg-none"></i><div class="ms-auto"><?=$hari.', '.date('j').' '.$bulan.' '.date('Y')?></div>
++<span class="clock" id="clock"><?=date('H:i:s')?></span>
++<a class="bell" href="clients.php" title="<?=$pending?> perangkat menunggu persetujuan"><i class="bi bi-bell"></i><?php if($pending) echo '<span class="n">'.$pending.'</span>'; ?></a>
++<div class="dropdown"><a class="prof dropdown-toggle" href="#" data-bs-toggle="dropdown"><span class="av"><i class="bi bi-person-fill"></i></span><span><b><?=h($user)?></b><small><?=h(ucfirst($role))?></small></span></a>
++<ul class="dropdown-menu dropdown-menu-end"><li><a class="dropdown-item" href="settings.php"><i class="bi bi-gear me-2"></i>Pengaturan</a></li><li><a class="dropdown-item text-danger" href="logout.php"><i class="bi bi-box-arrow-left me-2"></i>Keluar</a></li></ul></div></header>
++<div class="content"><h1 class="page-title"><?=h($title)?></h1><div class="page-sub"><?=h($sub)?></div>
+ <?php if(!empty($_SESSION['flash'])){ [$m,$t]=$_SESSION['flash']; unset($_SESSION['flash']); echo '<div class="alert alert-'.h($t).'">'.h($m).'</div>'; } ?>
+ <?php }
+-function page_footer(){ echo '</div><script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script></body></html>'; }
++function page_footer(){ ?></div></div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++<script>(function(){const c=document.getElementById('clock');const p=n=>String(n).padStart(2,'0');setInterval(()=>{const d=new Date();c.textContent=p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())},1000)})();</script>
++</body></html><?php }
+diff --git a/public/assets/rcm.css b/public/assets/rcm.css
+new file mode 100644
+index 0000000..af6beb1
+--- /dev/null
++++ b/public/assets/rcm.css
+@@ -0,0 +1,47 @@
++/* RCM - tema bersama (sidebar navy, kartu putih, aksen biru) */
++:root{--navy:#0b1a3a;--navy2:#132a5c;--blue:#1d6ff2;--bg:#f3f6fc;--line:#e4e9f4;--muted:#6b7a99;--green:#22a861;--red:#ef4444;--orange:#f59e0b;--purple:#8b5cf6}
++body{background:var(--bg);font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;color:#1b2440;font-size:.9rem}
++.side{width:240px;height:100vh;background:var(--navy);position:fixed;top:0;left:0;display:flex;flex-direction:column;z-index:20}
++.brand{display:flex;gap:.7rem;align-items:center;padding:1.1rem 1rem}.brand .logo{width:42px;height:42px;border-radius:50%;background:var(--blue);display:grid;place-items:center;color:#fff;font-size:1.3rem}
++.brand b{color:#fff;display:block;font-size:.98rem;line-height:1.2}.brand small{color:#9fb0d6;font-size:.75rem}
++.side nav{flex:1;overflow:auto}.side nav a{color:#cfd8f3;text-decoration:none;display:flex;align-items:center;gap:.7rem;padding:.62rem .9rem;border-radius:.55rem;margin:.15rem .75rem;font-weight:500}
++.side nav a i.bi:first-child{font-size:1.1rem}.side nav a:hover{background:var(--navy2);color:#fff}.side nav a.active{background:var(--blue);color:#fff;box-shadow:0 4px 12px rgba(29,111,242,.35)}
++.side nav a .chev{margin-left:auto;font-size:.7rem;opacity:.6}
++.srv{margin:.9rem;border:1px solid #23407f;border-radius:.7rem;padding:.7rem .9rem;color:#cfd8f3;font-size:.8rem}.srv .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#2fdc7f;margin-right:.4rem;box-shadow:0 0 0 3px rgba(47,220,127,.2)}
++.srv b{color:#2fdc7f}
++.main{margin-left:240px;min-height:100vh}
++.topbar{height:60px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:1rem;padding:0 1.5rem;position:sticky;top:0;z-index:10}
++.topbar .clock{border:1px solid var(--line);border-radius:.4rem;padding:.15rem .5rem;font-variant-numeric:tabular-nums}
++.bell{position:relative;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:#f1f4fb;color:#33415c;text-decoration:none}.bell .n{position:absolute;top:-3px;right:-3px;background:var(--red);color:#fff;border-radius:9px;font-size:.62rem;padding:0 .35rem}
++.prof{display:flex;align-items:center;gap:.55rem;text-decoration:none;color:inherit}.prof .av{width:36px;height:36px;border-radius:50%;background:#2b4c8c;color:#fff;display:grid;place-items:center}.prof small{color:var(--muted);display:block;font-size:.72rem;line-height:1}
++.content{padding:1.25rem 1.5rem}
++.page-title{font-weight:800;font-size:1.6rem;margin:0}.page-sub{color:var(--muted);margin-bottom:1rem}
++.card{border:1px solid var(--line);border-radius:.85rem;box-shadow:0 1px 3px rgba(16,30,70,.04)}.card-title{font-weight:700;font-size:1.02rem}
++.card .sub{color:var(--muted);font-size:.8rem}
++.stat{border-radius:.85rem;padding:1rem;display:flex;gap:.9rem;align-items:center;border:1px solid var(--line);height:100%}
++.stat .ic{width:52px;height:52px;border-radius:.7rem;display:grid;place-items:center;color:#fff;font-size:1.5rem;flex:none}
++.stat .lb{font-weight:600;font-size:.82rem}.stat .v{font-size:1.6rem;font-weight:800;line-height:1.1}.stat .pc{font-size:.72rem;margin-left:auto;align-self:flex-end}
++.s-blue{background:#eef4ff}.s-blue .ic{background:var(--blue)}.s-blue .lb{color:var(--blue)}
++.s-green{background:#ecfbf2}.s-green .ic{background:var(--green)}.s-green .lb{color:var(--green)}
++.s-red{background:#fff0f0}.s-red .ic{background:var(--red)}.s-red .lb{color:var(--red)}
++.s-purple{background:#f4f0ff}.s-purple .ic{background:var(--purple)}.s-purple .lb{color:var(--purple)}
++.table{--bs-table-bg:transparent;font-size:.84rem}.table thead th{background:#f5f7fc;color:#33415c;font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap}
++.st-on{color:var(--green)}.st-off{color:var(--red)}.st-on::before,.st-off::before{content:"●";margin-right:.3rem}
++.ra{width:28px;height:28px;padding:0;display:inline-grid;place-items:center;border-radius:.4rem;border:0}
++.ra-run{background:var(--blue);color:#fff}.ra-pw{background:#dcfce7;color:var(--green)}.ra-send{background:#e8f0ff;color:var(--blue)}.ra-more{background:#f1f4fb;color:#33415c}
++.mass{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem}.mass button{border:0;border-radius:.6rem;color:#fff;padding:.9rem .3rem;font-weight:600;font-size:.78rem}.mass i{display:block;font-size:1.6rem}
++.m-green{background:var(--green)}.m-blue{background:var(--blue)}.m-orange{background:var(--orange)}.m-red{background:var(--red)}
++.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem}.tile{border:1px solid var(--line);border-radius:.6rem;padding:.8rem .3rem;text-align:center;font-size:.76rem;text-decoration:none;color:#33415c;background:#f8faff}
++.tile i{display:block;font-size:1.5rem;margin-bottom:.2rem}.tile:hover{border-color:var(--blue)}
++.t1{background:#eef4ff}.t1 i{color:var(--blue)}.t2{background:#f4f0ff}.t2 i{color:var(--purple)}.t3{background:#fff0f0;border-color:#f8b4b4}.t3 i{color:var(--red)}.t4{background:#eafaf6}.t4 i{color:#0d9488}
++.t5{background:#fff7e6}.t5 i{color:var(--orange)}.t6{background:#ffeef0}.t6 i{color:var(--red)}.t7{background:#eef0ff}.t7 i{color:#4f46e5}.t8{background:#f1f3f7}.t8 i{color:#475569}
++.badge-s{display:inline-flex;align-items:center;gap:.3rem;border-radius:1rem;padding:.15rem .55rem;font-size:.72rem;font-weight:600}.badge-s::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
++.b-ok{background:#dcfce7;color:#15803d}.b-fail{background:#fee2e2;color:#b91c1c}.b-wait{background:#fef3c7;color:#b45309}.b-idle{background:#eef1f6;color:#64748b}.b-info{background:#e0ecff;color:#1d4ed8}
++.nav-tabs .nav-link{color:var(--muted);font-weight:500}.nav-tabs .nav-link.active{color:var(--blue);border-bottom:2px solid var(--blue)}
++.tip{background:#eef4ff;border:1px solid #d6e4ff;border-radius:.7rem;padding:.8rem 1rem;font-size:.8rem}
++.summary{background:#ecfbf2;border:1px solid #bdecd0;border-radius:.7rem;padding:1rem}.summary dt{font-weight:500;color:var(--muted)}
++.fav-ic{width:36px;height:36px;border-radius:.5rem;display:grid;place-items:center;background:#eef4ff;color:var(--blue);font-size:1.1rem;flex:none}
++.form-check-input:checked{background-color:var(--blue);border-color:var(--blue)}
++.btn-primary{background:var(--blue);border-color:var(--blue)}
++.pagination .page-link{border-radius:.4rem!important;margin:0 .15rem}
++@media(max-width:992px){.side{position:static;width:100%;height:auto}.main{margin-left:0}.mass,.tiles{grid-template-columns:repeat(2,1fr)}}
+diff --git a/public/clients.php b/public/clients.php
+index 0e5a8da..f68527d 100644
+--- a/public/clients.php
++++ b/public/clients.php
+@@ -19,15 +19,15 @@ $rooms=db()->query('SELECT * FROM rooms ORDER BY name')->fetchAll();
+ $opt=function($sel) use($rooms){ $o='<option value="0">- Belum ada ruang -</option>'; foreach($rooms as $r)$o.='<option value="'.$r['id'].'"'.($r['id']==$sel?' selected':'').'>'.h($r['name']).'</option>'; return $o; };
+ $pend=db()->query("SELECT * FROM clients WHERE status='pending' ORDER BY id")->fetchAll();
+ $all=db()->query("SELECT c.*,".is_online_sql('c')." is_on FROM clients c WHERE status<>'pending' ORDER BY c.name")->fetchAll();
+-page_header('Kelola Client','clients');
+-if($pend): ?><div class="card border-warning mb-3"><div class="card-body"><h5>Menunggu persetujuan (<?=count($pend)?>)</h5><p class="text-muted small">Agent terpasang di PC ini tetapi belum pernah di-scan/disetujui.</p><table class="table table-sm align-middle">
++page_header('Kelola Client','clients','Persetujuan perangkat, ruang, dan token agent.');
++if($pend): ?><div class="card border-warning mb-3"><div class="card-body"><div class="card-title mb-2">Menunggu persetujuan (<?=count($pend)?>)</div><p class="text-muted small">Agent terpasang di PC ini tetapi belum pernah di-scan/disetujui.</p><table class="table table-sm align-middle">
+ <?php foreach($pend as $c): ?><tr><form method="post"><?=csrf_field()?><input type="hidden" name="id" value="<?=$c['id']?>"><input type="hidden" name="action" value="approve">
+ <td class="fw-semibold"><?=h($c['name'])?></td><td><?=h($c['ip'])?></td><td class="small"><?=h($c['mac'])?></td><td><select name="room" class="form-select form-select-sm"><?=$opt($c['room_id'])?></select></td>
+ <td><button class="btn btn-sm btn-success">Setujui</button></td></form><td><form method="post" onsubmit="return confirm('Tolak dan hapus?')"><?=csrf_field()?><input type="hidden" name="id" value="<?=$c['id']?>"><input type="hidden" name="action" value="delete"><button class="btn btn-sm btn-outline-danger">Tolak</button></form></td></tr><?php endforeach; ?></table></div></div><?php endif; ?>
+ <div class="card"><div class="card-body"><table class="table align-middle"><thead><tr><th>Nama</th><th>IP</th><th>MAC</th><th>Ruang</th><th>Status</th><th>Versi</th><th></th></tr></thead><tbody>
+ <?php foreach($all as $c): ?><tr><td class="fw-semibold"><?=h($c['name'])?></td><td><?=h($c['ip'])?></td><td class="small"><?=h($c['mac'])?></td>
+ <td><form method="post" class="d-flex gap-1"><?=csrf_field()?><input type="hidden" name="id" value="<?=$c['id']?>"><input type="hidden" name="action" value="setroom"><select name="room" class="form-select form-select-sm" onchange="this.form.submit()"><?=$opt($c['room_id'])?></select></form></td>
+-<td><?=$c['status']==='approved'?'<span class="badge text-bg-secondary">Menunggu Agent</span>':($c['is_on']?'<span class="text-success">● Online</span>':'<span class="text-danger">● Offline</span>')?></td><td class="small"><?=h($c['agent_version'])?></td>
++<td><?=$c['status']==='approved'?'<span class="badge-s b-idle">Menunggu Agent</span>':($c['is_on']?'<span class="st-on">Online</span>':'<span class="st-off">Offline</span>')?></td><td class="small"><?=h($c['agent_version'])?></td>
+ <td class="text-nowrap"><form method="post" class="d-inline"><?=csrf_field()?><input type="hidden" name="id" value="<?=$c['id']?>"><input type="hidden" name="action" value="quick"><div class="btn-group btn-group-sm"><button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">Aksi</button><ul class="dropdown-menu"><?php foreach(($c['is_on']?['lock'=>'Kunci','unlock'=>'Buka kunci','restart'=>'Restart','shutdown'=>'Matikan']:['wake'=>'Nyalakan (WoL)']) as $k=>$l) echo '<li><button class="dropdown-item" name="type" value="'.$k.'">'.$l.'</button></li>'; ?></ul></div></form> <?php if($c['status']==='active'): ?><form method="post" class="d-inline"><?=csrf_field()?><input type="hidden" name="id" value="<?=$c['id']?>"><input type="hidden" name="action" value="testping"><button class="btn btn-sm btn-outline-primary">Tes ping</button></form> <form method="post" class="d-inline" onsubmit="return confirm('Reset token? Agent harus mendaftar ulang.')"><?=csrf_field()?><input type="hidden" name="id" value="<?=$c['id']?>"><input type="hidden" name="action" value="reset"><button class="btn btn-sm btn-outline-secondary">Reset token</button></form> <?php endif; ?>
+ <form method="post" class="d-inline" onsubmit="return confirm('Hapus client ini?')"><?=csrf_field()?><input type="hidden" name="id" value="<?=$c['id']?>"><input type="hidden" name="action" value="delete"><button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form></td></tr>
+ <?php endforeach; if(!$all) echo '<tr><td colspan="7" class="text-center text-muted py-4">Belum ada client.</td></tr>'; ?></tbody></table></div></div>
+diff --git a/public/control.php b/public/control.php
+index d0fee95..b3a022a 100644
+--- a/public/control.php
++++ b/public/control.php
+@@ -2,7 +2,12 @@
+ require __DIR__.'/../includes/bootstrap.php'; require __DIR__.'/../includes/layout.php'; require_login(); expire_tasks();
+ $ACT=ACT;
+ if($_SERVER['REQUEST_METHOD']==='POST'){
+-  csrf_check(); $a=$_POST['action']??''; $mode=$_POST['mode']??'all'; $back=function($m,$t){ flash($m,$t); header('Location: control.php'); exit; };
++  csrf_check(); $a=$_POST['action']??''; $mode=$_POST['mode']??'all';
++  $to=in_array($_POST['back']??'',['index.php','control.php'],true)?$_POST['back']:'control.php';
++  $back=function($m,$t)use($to){ flash($m,$t); header('Location: '.$to); exit; };
++  // Target ringkas dari dashboard: all | room:ID | pc:ID
++  if(isset($_POST['target'])){ $tg=explode(':',(string)$_POST['target']);
++    if($tg[0]==='room'){ $mode='room'; $_POST['room']=(int)($tg[1]??0); } elseif($tg[0]==='pc'){ $mode='pick'; $_POST['ids']=[(int)($tg[1]??0)]; } else $mode='all'; }
+   if(!isset(ACT[$a])) $back('Aksi tidak valid.','danger');
+   $err=null; $pl=build_payload($a,$_POST,$err); if($err) $back($err,'danger');
+   if($mode==='pick'&&empty($_POST['ids'])) $back('Pilih minimal satu komputer.','warning');
+@@ -18,30 +23,39 @@ $apps=db()->query("SELECT id,name FROM programs WHERE type='app' AND allowed=1 O
+ $urls=db()->query("SELECT name,path,parameter FROM programs WHERE type='url' AND allowed=1 ORDER BY name")->fetchAll();
+ $tasks=db()->query('SELECT t.*,c.name cname FROM tasks t JOIN clients c ON c.id=t.client_id ORDER BY t.id DESC LIMIT 12')->fetchAll();
+ $pre=isset($ACT[$_GET['act']??''])?$_GET['act']:'lock';
+-page_header('Kontrol Client','control'); ?>
+-<form method="post" class="card mb-3" onsubmit="return confirmAct()"><div class="card-body"><?=csrf_field()?>
+-<div class="row g-3"><div class="col-lg-5"><h5>1. Target</h5>
+-<label class="d-block"><input type="radio" name="mode" value="all" checked> Semua client online</label>
+-<label class="d-block"><input type="radio" name="mode" value="room"> Per ruang</label>
+-<select name="room" class="form-select form-select-sm mb-2" id="roomSel"><?php foreach($rooms as $r) echo '<option value="'.$r['id'].'">'.h($r['name']).'</option>'; ?></select>
+-<label class="d-block"><input type="radio" name="mode" value="pick"> Komputer tertentu</label>
+-<div id="pickBox" class="border rounded p-2" style="max-height:200px;overflow:auto"><?php foreach($cl as $c) echo '<label class="d-block'.($c['is_on']?'':' text-muted').'"><input type="checkbox" name="ids[]" value="'.$c['id'].'"'.' data-on="'.(int)$c['is_on'].'"> '.h($c['name']).' <small>('.h($c['room']?:'-').')</small>'.($c['is_on']?'':' offline').'</label>'; ?></div></div>
+-<div class="col-lg-7"><h5>2. Aksi</h5><select name="action" id="act" class="form-select mb-3"><?php foreach($ACT as $k=>$v) echo '<option value="'.$k.'"'.($k===$pre?' selected':'').'>'.h($v).'</option>'; ?></select>
++page_header('Remote Application Launcher','control','Buka aplikasi, browser, atau URL dan kirim perintah ke komputer client.'); ?>
++<form method="post" onsubmit="return confirmAct()"><?=csrf_field()?>
++<div class="row g-3 mb-3"><div class="col-lg-5"><div class="card h-100"><div class="card-body"><div class="card-title mb-2">Target</div>
++<label class="d-block mb-1"><input class="form-check-input" type="radio" name="mode" value="all" checked> Semua komputer online</label>
++<label class="d-block mb-1"><input class="form-check-input" type="radio" name="mode" value="room"> Satu ruang laboratorium</label>
++<select name="room" class="form-select form-select-sm mb-2 ms-4 w-auto" id="roomSel"><?php foreach($rooms as $r) echo '<option value="'.$r['id'].'">'.h($r['name']).'</option>'; ?></select>
++<label class="d-block mb-1"><input class="form-check-input" type="radio" name="mode" value="pick"> Komputer tertentu</label>
++<div id="pickBox" class="border rounded p-2 ms-4" style="max-height:220px;overflow:auto"><?php foreach($cl as $c) echo '<label class="d-block'.($c['is_on']?'':' text-muted').'"><input class="form-check-input" type="checkbox" name="ids[]" value="'.$c['id'].'"'.' data-on="'.(int)$c['is_on'].'"> '.h($c['name']).' <small>('.h($c['room']?:'-').')</small>'.($c['is_on']?'':' <span class="st-off small">offline</span>').'</label>'; ?></div></div></div></div>
++<div class="col-lg-7"><div class="card h-100"><div class="card-body"><div class="card-title mb-2">Jenis Perintah</div><select name="action" id="act" class="form-select mb-3"><?php foreach($ACT as $k=>$v) echo '<option value="'.$k.'"'.($k===$pre?' selected':'').'>'.h($v).'</option>'; ?></select>
+ <div class="g g-lock"><label class="form-label">Pesan di layar kunci</label><textarea name="lock_msg" class="form-control" rows="3" maxlength="500">Ujian CBT akan segera dimulai. Mohon persiapkan diri dan jangan mengoperasikan komputer lain. Terima kasih.</textarea></div>
+-<div class="g g-message"><label class="form-label">Isi pesan</label><textarea name="msg_text" class="form-control" rows="3" maxlength="500"></textarea><label class="mt-2"><input type="checkbox" name="show_ok" value="1" checked> Tampilkan tombol OK (wajib ditekan)</label></div>
+-<div class="g g-open_url"><label class="form-label">URL</label><input name="url" class="form-control" list="urls" placeholder="https://..."><datalist id="urls"><?php foreach($urls as $u) echo '<option value="'.h($u['path']).'">'.h($u['name']).'</option>'; ?></datalist>
+-<div class="row g-2 mt-1"><div class="col-6"><select name="browser" class="form-select"><option value="chrome">Google Chrome</option><option value="edge">Microsoft Edge</option><option value="default">Browser default</option></select></div><div class="col-6 pt-2"><label><input type="checkbox" name="kiosk" value="1"> Mode kiosk / fullscreen</label></div></div></div>
+-<div class="g g-run_app"><label class="form-label">Program (hanya yang diizinkan)</label><select name="program" class="form-select"><?php foreach($apps as $a) echo '<option value="'.$a['id'].'">'.h($a['name']).'</option>'; ?></select></div>
+-<div class="g g-unlock g-restart g-shutdown g-wake text-muted small">Tidak ada pengaturan tambahan. Restart/Matikan dijalankan 10 detik setelah diterima. Wake-on-LAN hanya untuk client offline dan butuh WoL aktif di BIOS/NIC.</div>
+-<button class="btn btn-primary mt-3"><i class="bi bi-send"></i> Kirim Perintah</button></div></div></div></form>
+-<div class="card"><div class="card-body"><h5>Tugas terakhir</h5><table class="table table-sm mb-0"><thead><tr><th>Waktu</th><th>Client</th><th>Tugas</th><th>Status</th><th>Hasil</th></tr></thead><tbody>
+-<?php $bc=['pending'=>'secondary','sent'=>'info','running'=>'info','done'=>'success','failed'=>'danger']; foreach($tasks as $t) echo '<tr><td>'.h(date('H:i:s',strtotime($t['created_at']))).'</td><td>'.h($t['cname']).'</td><td>'.h($ACT[$t['type']]??$t['type']).'</td><td><span class="badge text-bg-'.$bc[$t['status']].'">'.h($t['status']).'</span></td><td class="text-muted">'.h($t['result']).'</td></tr>'; ?></tbody></table></div></div>
++<div class="g g-message"><label class="form-label">Isi pesan</label><textarea name="msg_text" class="form-control" rows="3" maxlength="500"></textarea><label class="mt-2"><input class="form-check-input" type="checkbox" name="show_ok" value="1" checked> Tampilkan tombol OK (wajib ditekan)</label></div>
++<div class="g g-open_url"><label class="form-label">Browser</label><select name="browser" id="browser" class="form-select mb-2"><option value="chrome">Google Chrome</option><option value="edge">Microsoft Edge</option><option value="default">Browser default</option></select>
++<label class="form-label">URL Tujuan</label><input name="url" id="url" class="form-control" list="urls" placeholder="https://..."><datalist id="urls"><?php foreach($urls as $u) echo '<option value="'.h($u['path']).'">'.h($u['name']).'</option>'; ?></datalist>
++<label class="mt-2 d-block"><input class="form-check-input" type="checkbox" name="kiosk" id="kiosk" value="1"> Mode kiosk / fullscreen</label><small class="text-muted ms-4">Browser dibuka dalam mode layar penuh jika didukung (Chrome/Edge).</small></div>
++<div class="g g-run_app"><label class="form-label">Program (hanya yang diizinkan)</label><select name="program" id="prog" class="form-select"><?php foreach($apps as $a) echo '<option value="'.$a['id'].'">'.h($a['name']).'</option>'; ?></select></div>
++<div class="g g-unlock g-restart g-shutdown g-wake text-muted small">Tidak ada pengaturan tambahan. Restart/Matikan dijalankan 10 detik setelah diterima. Wake-on-LAN hanya untuk client offline dan butuh WoL aktif di BIOS/NIC.</div></div></div></div></div>
++<div class="row g-3 mb-3 align-items-center"><div class="col-lg-8"><div class="summary"><b class="text-success"><i class="bi bi-terminal"></i> Ringkasan Perintah</b><dl class="row mb-0 mt-2 small" id="sum"></dl></div></div>
++<div class="col-lg-4"><button class="btn btn-primary btn-lg w-100"><i class="bi bi-send-fill"></i> Kirim Perintah</button></div></div></form>
++<div class="card"><div class="card-body"><div class="card-title mb-2">Tugas terakhir</div><table class="table table-sm mb-0"><thead><tr><th>Waktu</th><th>Client</th><th>Tugas</th><th>Status</th><th>Hasil</th></tr></thead><tbody>
++<?php $bc=['pending'=>'b-idle','sent'=>'b-info','running'=>'b-info','done'=>'b-ok','failed'=>'b-fail']; foreach($tasks as $t) echo '<tr><td>'.h(date('H:i:s',strtotime($t['created_at']))).'</td><td>'.h($t['cname']).'</td><td>'.h($ACT[$t['type']]??$t['type']).'</td><td><span class="badge-s '.$bc[$t['status']].'">'.h($t['status']).'</span></td><td class="text-muted">'.h($t['result']).'</td></tr>'; ?></tbody></table></div></div>
+ <script>
+ const act=document.getElementById('act');
+ function sync(){document.querySelectorAll('.g').forEach(e=>e.style.display=e.classList.contains('g-'+act.value)?'':'none');
+  document.querySelectorAll('#pickBox input').forEach(i=>{i.disabled=(act.value==='wake')===(i.dataset.on==='1');if(i.disabled)i.checked=false;});
+  const m=document.querySelector('[name=mode]:checked').value;document.getElementById('roomSel').disabled=m!=='room';document.getElementById('pickBox').style.opacity=m==='pick'?1:.5;}
+ function confirmAct(){return !['restart','shutdown','lock'].includes(act.value)||confirm('Yakin menjalankan "'+act.options[act.selectedIndex].text+'" pada target terpilih?')}
+-act.onchange=sync;document.querySelectorAll('[name=mode]').forEach(r=>r.onchange=sync);sync();
++function summary(){const m=document.querySelector('[name=mode]:checked').value,sel=e=>e.options[e.selectedIndex]?.text||'-';
++ const t=m==='all'?'Semua komputer online':m==='room'?'Ruang '+sel(document.getElementById('roomSel')):document.querySelectorAll('#pickBox input:checked').length+' komputer dipilih';
++ const rows=[['Target',t],['Perintah',sel(act)]];
++ if(act.value==='open_url'){rows.push(['Browser',sel(document.getElementById('browser'))],['URL',document.getElementById('url').value||'-'],['Mode',document.getElementById('kiosk').checked?'Fullscreen (kiosk)':'Jendela biasa']);}
++ if(act.value==='run_app')rows.push(['Program',sel(document.getElementById('prog'))]);
++ const d=document.getElementById('sum');d.innerHTML='';rows.forEach(([k,v])=>{const a=document.createElement('dt'),b=document.createElement('dd');a.className='col-3';b.className='col-9 mb-1';a.textContent=k;b.textContent=': '+v;d.append(a,b);});}
++document.querySelector('form').addEventListener('input',summary);document.querySelector('form').addEventListener('change',summary);
++act.onchange=sync;document.querySelectorAll('[name=mode]').forEach(r=>r.onchange=sync);sync();summary();
+ </script>
+ <?php page_footer();
+diff --git a/public/index.php b/public/index.php
+index ac78b51..6c0b26c 100644
+--- a/public/index.php
++++ b/public/index.php
+@@ -1,5 +1,6 @@
+ <?php
+ require __DIR__.'/../includes/bootstrap.php'; require __DIR__.'/../includes/layout.php'; require_login();
++// Semua form di halaman ini POST ke control.php (sudah memeriksa CSRF) lalu kembali ke index.php.
+ $on=is_online_sql('c');
+ $st=db()->query("SELECT SUM(status IN('approved','active')) total, SUM($on) online, SUM(status='pending') pending FROM clients c")->fetch();
+ $total=(int)$st['total'];$online=(int)$st['online'];$offline=$total-$online;$pending=(int)$st['pending'];expire_tasks();$proc=(int)db()->query("SELECT COUNT(*) FROM tasks WHERE status IN('pending','sent')")->fetchColumn();
+@@ -13,31 +14,94 @@ $s=db()->prepare("SELECT COUNT(*) FROM clients c LEFT JOIN rooms r ON r.id=c.roo
+ $pages=max(1,(int)ceil($n/$per));$pg=min($pg,$pages);$off=($pg-1)*$per;
+ $s=db()->prepare("SELECT c.*,r.name room,$on is_on FROM clients c LEFT JOIN rooms r ON r.id=c.room_id WHERE $W ORDER BY c.name LIMIT $per OFFSET $off");$s->execute($p);$rows=$s->fetchAll();
+ $rooms=db()->query('SELECT * FROM rooms ORDER BY name')->fetchAll();
++$all=db()->query("SELECT id,name FROM clients WHERE status IN('approved','active') ORDER BY name")->fetchAll();
+ $logs=db()->query('SELECT * FROM activity_logs ORDER BY id DESC LIMIT 6')->fetchAll();
++$favs=db()->query('SELECT * FROM programs WHERE allowed=1 ORDER BY type,name LIMIT 5')->fetchAll();
++$apps=db()->query("SELECT id,name FROM programs WHERE type='app' AND allowed=1 ORDER BY name")->fetchAll();
++$dow=(int)date('N');
++$today=array_values(array_filter(db()->query('SELECT s.*,r.name room FROM schedules s LEFT JOIN rooms r ON r.id=s.room_id WHERE s.active=1 ORDER BY s.run_time')->fetchAll(),fn($x)=>in_array($dow,array_map('intval',explode(',',$x['days'])),true)));
+ $qs=fn($x)=>h(http_build_query(array_merge(['q'=>$q,'room'=>$room,'st'=>$f,'per'=>$per],$x)));
+-page_header('Dashboard','index'); ?>
+-<?php if($pending): ?><div class="alert alert-warning py-2"><?=$pending?> perangkat menunggu persetujuan. <a href="clients.php">Lihat</a></div><?php endif; ?>
+-<div class="card mb-3"><div class="card-body d-flex flex-wrap gap-2 align-items-center"><b class="me-2">Kontrol Massal</b>
+-<?php foreach(['wake'=>['Nyalakan Semua','info'],'lock'=>['Kunci Semua','danger'],'message'=>['Kirim Pesan','primary'],'open_url'=>['Buka URL','success'],'restart'=>['Restart','warning'],'shutdown'=>['Matikan','dark']] as $k=>$v) echo '<a class="btn btn-'.$v[1].' btn-sm" href="control.php?act='.$k.'">'.$v[0].'</a>'; ?></div></div>
+-<div class="row g-3 mb-3">
+-<?php foreach([['Total Client',$total,'primary','bi-pc-display'],['Online',$online,'success','bi-check-circle'],['Offline',$offline,'danger','bi-x-circle'],['Dalam Proses',$proc,'info','bi-arrow-repeat']] as $c): ?>
+-<div class="col-6 col-lg-3"><div class="card stat"><div class="card-body d-flex align-items-center gap-3"><i class="bi <?=$c[3]?> fs-1 text-<?=$c[2]?>"></i>
+-<div><div class="text-muted small"><?=$c[0]?></div><div class="fs-3 fw-bold"><?=$c[1]?></div><?php if($c[0]==='Online'&&$total) echo '<small class="text-success">'.round($online/$total*100).'%</small>'; ?></div></div></div></div>
+-<?php endforeach; ?></div>
+-<div class="card mb-3"><div class="card-body"><h5 class="fw-bold">Daftar Komputer Client</h5>
+-<form class="row g-2 mb-3"><div class="col-md-5"><input class="form-control" name="q" value="<?=h($q)?>" placeholder="Cari nama komputer, IP, atau ruang..."></div>
+-<div class="col-md-2"><select name="room" class="form-select"><option value="0">Semua Ruang</option><?php foreach($rooms as $r) echo '<option value="'.$r['id'].'"'.($room==$r['id']?' selected':'').'>'.h($r['name']).'</option>'; ?></select></div>
+-<div class="col-md-2"><select name="st" class="form-select"><option value="">Semua Status</option><option value="online"<?=$f==='online'?' selected':''?>>Online</option><option value="offline"<?=$f==='offline'?' selected':''?>>Offline</option></select></div>
+-<div class="col-md-2"><select name="per" class="form-select"><?php foreach([10,25,50] as $x) echo "<option".($per==$x?' selected':'').">$x</option>"; ?></select></div>
+-<div class="col-md-1"><button class="btn btn-primary w-100"><i class="bi bi-search"></i></button></div></form>
+-<div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>No</th><th>Nama Client</th><th>IP Address</th><th>MAC</th><th>Ruang</th><th>Status</th><th>Aktivitas Terakhir</th></tr></thead><tbody>
+-<?php foreach($rows as $i=>$r): ?><tr><td><?=$off+$i+1?></td><td class="fw-semibold"><?=h($r['name'])?></td><td><?=h($r['ip']?:'-')?></td><td class="small text-muted"><?=h($r['mac'])?></td><td><?=h($r['room']?:'Belum ada ruang')?></td>
+-<td><?php if($r['status']==='approved') echo '<span class="badge text-bg-secondary">Menunggu Agent</span>'; elseif($r['is_on']) echo '<span class="text-success">● Online</span>'; else echo '<span class="text-danger">● Offline</span>'; ?></td>
+-<td><?=$r['last_seen']?h(date('d M H:i',strtotime($r['last_seen']))):'-'?></td></tr>
+-<?php endforeach; if(!$rows) echo '<tr><td colspan="7" class="text-center text-muted py-4">Belum ada client. Mulai dari menu <a href="scan.php">Scan Jaringan</a>.</td></tr>'; ?></tbody></table></div>
+-<div class="d-flex justify-content-between align-items-center"><small class="text-muted">Menampilkan <?=count($rows)?> dari <?=$n?> data</small>
+-<ul class="pagination pagination-sm mb-0"><?php for($i=1;$i<=$pages;$i++) echo '<li class="page-item'.($i==$pg?' active':'').'"><a class="page-link" href="?'.$qs(['p'=>$i]).'">'.$i.'</a></li>'; ?></ul></div></div></div>
+-<div class="card"><div class="card-body"><h5 class="fw-bold">Log Aktivitas Terbaru</h5><table class="table table-sm mb-0"><thead><tr><th>Waktu</th><th>User</th><th>Aksi</th><th>Target</th><th>Status</th><th>Keterangan</th></tr></thead><tbody>
+-<?php foreach($logs as $l) echo '<tr><td>'.h(date('H:i',strtotime($l['created_at']))).'</td><td>'.h($l['user']).'</td><td>'.h($l['action']).'</td><td>'.h($l['target']).'</td><td><span class="badge text-bg-'.($l['status']==='Sukses'?'success':'danger').'">'.h($l['status']).'</span></td><td class="text-muted">'.h($l['note']).'</td></tr>'; ?></tbody></table></div></div>
+-<script>setTimeout(()=>location.reload(),30000)</script>
++$CF=csrf_field();
++$opts=function() use($rooms,$all,$total){ $o='<option value="all">Semua komputer ('.$total.')</option><optgroup label="Per ruang">'; foreach($rooms as $r) $o.='<option value="room:'.$r['id'].'">'.h($r['name']).'</option>';
++  $o.='</optgroup><optgroup label="Satu komputer">'; foreach($all as $c) $o.='<option value="pc:'.$c['id'].'">'.h($c['name']).'</option>'; return $o.'</optgroup>'; };
++$TPL=['Ujian CBT akan segera dimulai. Mohon persiapkan diri.','Perangkat akan otomatis dimatikan dalam 10 menit.','Jangan membuka aplikasi lain selama ujian berlangsung.','Waktu praktikum tersisa 5 menit. Simpan pekerjaan Anda.'];
++page_header('Dashboard','index','Kelola dan pantau semua komputer client dari satu tempat.'); ?>
++<?php if($pending): ?><div class="alert alert-warning py-2"><i class="bi bi-bell me-1"></i><?=$pending?> perangkat menunggu persetujuan. <a href="clients.php">Lihat</a></div><?php endif; ?>
++<form method="post" action="control.php" id="massForm"><?=$CF?><input type="hidden" name="back" value="index.php"><input type="hidden" name="action"><input type="hidden" name="mode" value="all"></form>
++<form method="post" action="control.php" id="rowForm"><?=$CF?><input type="hidden" name="back" value="index.php"><input type="hidden" name="action"><input type="hidden" name="target"></form>
++<div class="row g-3">
++<div class="col-xl-8">
++ <div class="row g-3 mb-3">
++ <?php foreach([['Total Client',$total,'s-blue','bi-pc-display','Semua perangkat'],['Online',$online,'s-green','bi-wifi',$total?round($online/$total*100).'%':''],['Offline',$offline,'s-red','bi-wifi-off',$total?round($offline/$total*100).'%':''],['Dalam Proses',$proc,'s-purple','bi-arrow-repeat','Menjalankan perintah']] as $c): ?>
++ <div class="col-6 col-lg-3"><div class="stat <?=$c[2]?>"><div class="ic"><i class="bi <?=$c[3]?>"></i></div><div><div class="lb"><?=$c[0]?></div><div class="v"><?=$c[1]?></div><small class="text-muted"><?=h($c[4])?></small></div></div></div>
++ <?php endforeach; ?></div>
++ <div class="card mb-3"><div class="card-body"><div class="card-title mb-3">Daftar Komputer Client</div>
++ <form class="row g-2 mb-3"><div class="col-md-4"><div class="input-group"><span class="input-group-text bg-white"><i class="bi bi-search"></i></span><input class="form-control" name="q" value="<?=h($q)?>" placeholder="Cari nama komputer, IP, atau ruang..."></div></div>
++ <div class="col-md-3"><select name="room" class="form-select" onchange="this.form.submit()"><option value="0">Semua Ruang</option><?php foreach($rooms as $r) echo '<option value="'.$r['id'].'"'.($room==$r['id']?' selected':'').'>'.h($r['name']).'</option>'; ?></select></div>
++ <div class="col-md-3"><select name="st" class="form-select" onchange="this.form.submit()"><option value="">Semua Status</option><option value="online"<?=$f==='online'?' selected':''?>>Online</option><option value="offline"<?=$f==='offline'?' selected':''?>>Offline</option></select></div>
++ <div class="col-md-2 d-flex align-items-center gap-2"><small class="text-muted">Tampilkan:</small><select name="per" class="form-select" onchange="this.form.submit()"><?php foreach([10,25,50] as $x) echo "<option".($per==$x?' selected':'').">$x</option>"; ?></select></div></form>
++ <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th><input class="form-check-input" type="checkbox" id="chkAll"></th><th>No</th><th>Nama Client</th><th>IP Address</th><th>Ruang</th><th>Status</th><th>Aktivitas Terakhir</th><th>Aksi</th></tr></thead><tbody>
++ <?php foreach($rows as $i=>$r): ?><tr><td><input class="form-check-input chk" type="checkbox" form="massForm" name="ids[]" value="<?=$r['id']?>"></td><td><?=$off+$i+1?></td><td class="fw-semibold"><?=h($r['name'])?></td><td><?=h($r['ip']?:'-')?></td><td><?=h($r['room']?:'Belum ada ruang')?></td>
++ <td><?php if($r['status']==='approved') echo '<span class="badge-s b-idle">Menunggu Agent</span>'; elseif($r['is_on']) echo '<span class="st-on">Online</span>'; else echo '<span class="st-off">Offline</span>'; ?></td>
++ <td><?=$r['last_seen']?h(date('d M H:i',strtotime($r['last_seen']))):'-'?></td>
++ <td class="text-nowrap"><a class="ra ra-run" title="Jalankan program" href="control.php?act=run_app"><i class="bi bi-play-fill"></i></a>
++ <button class="ra ra-pw" title="<?=$r['is_on']?'Matikan':'Nyalakan (WoL)'?>" onclick="rowAct('<?=$r['is_on']?'shutdown':'wake'?>',<?=$r['id']?>,'<?=h($r['name'])?>')"><i class="bi bi-power"></i></button>
++ <a class="ra ra-send" title="Kirim pesan" href="#pesan" onclick="pickTarget(<?=$r['id']?>)"><i class="bi bi-send-fill"></i></a>
++ <span class="dropdown"><button class="ra ra-more" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></button><ul class="dropdown-menu">
++ <?php foreach(['lock'=>'Kunci','unlock'=>'Buka Kunci','restart'=>'Restart'] as $k=>$v) echo '<li><a class="dropdown-item" href="#" onclick="rowAct(\''.$k.'\','.$r['id'].',\''.h($r['name']).'\');return false">'.$v.'</a></li>'; ?></ul></span></td></tr>
++ <?php endforeach; if(!$rows) echo '<tr><td colspan="8" class="text-center text-muted py-4">Belum ada client. Mulai dari menu <a href="scan.php">Scan Jaringan</a>.</td></tr>'; ?></tbody></table></div>
++ <div class="d-flex justify-content-between align-items-center"><small class="text-muted">Menampilkan <?=$n?$off+1:0?> - <?=$off+count($rows)?> dari <?=$n?> data</small>
++ <ul class="pagination pagination-sm mb-0"><li class="page-item<?=$pg<=1?' disabled':''?>"><a class="page-link" href="?<?=$qs(['p'=>$pg-1])?>">&lsaquo;</a></li><?php for($i=max(1,$pg-2);$i<=min($pages,$pg+2);$i++) echo '<li class="page-item'.($i==$pg?' active':'').'"><a class="page-link" href="?'.$qs(['p'=>$i]).'">'.$i.'</a></li>'; ?><li class="page-item<?=$pg>=$pages?' disabled':''?>"><a class="page-link" href="?<?=$qs(['p'=>$pg+1])?>">&rsaquo;</a></li></ul></div></div></div>
++ <div class="row g-3">
++  <div class="col-lg-7"><div class="card h-100"><div class="card-body"><div class="d-flex justify-content-between"><div class="card-title"><i class="bi bi-clock-history text-primary me-1"></i> Log Aktivitas Terbaru</div><a href="logs.php" class="small">Lihat Semua</a></div>
++  <table class="table table-sm mt-2 mb-0"><thead><tr><th>Waktu</th><th>User</th><th>Aksi</th><th>Target</th><th>Status</th><th>Keterangan</th></tr></thead><tbody>
++  <?php foreach($logs as $l) echo '<tr><td>'.h(date('H:i',strtotime($l['created_at']))).'</td><td>'.h($l['user']).'</td><td>'.h($l['action']).'</td><td>'.h($l['target']).'</td><td><span class="badge-s '.($l['status']==='Sukses'?'b-ok':'b-fail').'">'.h($l['status']).'</span></td><td class="text-muted small">'.h($l['note']).'</td></tr>';
++  if(!$logs) echo '<tr><td colspan="6" class="text-muted text-center">Belum ada log.</td></tr>'; ?></tbody></table></div></div></div>
++  <div class="col-lg-5"><div class="card h-100" id="pesan"><div class="card-body"><div class="card-title mb-2"><i class="bi bi-chat-dots-fill text-primary me-1"></i> Pesan ke Client</div>
++  <ul class="nav nav-tabs mb-3"><li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tLangsung" type="button">Pesan Langsung</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tTemplate" type="button">Template</button></li></ul>
++  <form method="post" action="control.php"><?=$CF?><input type="hidden" name="back" value="index.php"><input type="hidden" name="action" value="message">
++  <label class="form-label small fw-semibold">Target</label><select name="target" id="msgTarget" class="form-select form-select-sm mb-2"><?=$opts()?></select>
++  <div class="tab-content"><div class="tab-pane show active" id="tLangsung"></div><div class="tab-pane" id="tTemplate"><select class="form-select form-select-sm mb-2" onchange="if(this.value)document.getElementById('msgText').value=this.value"><option value="">Pilih template...</option><?php foreach($TPL as $t) echo '<option>'.h($t).'</option>'; ?></select></div></div>
++  <label class="form-label small fw-semibold">Pesan</label><textarea name="msg_text" id="msgText" class="form-control" rows="3" maxlength="500" placeholder="Tulis pesan yang akan dikirim ke client..." required></textarea>
++  <label class="small mt-2 d-block"><input type="checkbox" class="form-check-input" name="show_ok" value="1" checked> Tampilkan tombol OK (wajib ditekan)</label>
++  <button class="btn btn-primary w-100 mt-2"><i class="bi bi-send-fill"></i> Kirim Pesan</button></form></div></div></div>
++ </div>
++</div>
++<div class="col-xl-4">
++ <div class="card mb-3"><div class="card-body"><div class="card-title">Kontrol Massal</div><div class="sub mb-2">Berlaku untuk client yang dicentang, atau semua jika tidak ada yang dicentang.</div>
++ <div class="mass"><button class="m-green" onclick="mass('wake','Nyalakan')"><i class="bi bi-power"></i>Nyalakan Semua</button><button class="m-blue" onclick="location='control.php?act=run_app'"><i class="bi bi-play"></i>Jalankan Program</button>
++ <button class="m-orange" onclick="mass('restart','Restart')"><i class="bi bi-arrow-repeat"></i>Restart Client</button><button class="m-red" onclick="mass('shutdown','Matikan')"><i class="bi bi-power"></i>Matikan Semua</button></div></div></div>
++ <div class="card mb-3"><div class="card-body"><div class="card-title mb-2"><i class="bi bi-lightning-charge text-primary"></i> Aksi Cepat</div><div class="tiles">
++ <?php foreach([['t1','bi-globe','Buka Browser & URL','control.php?act=open_url'],['t2','bi-grid-fill','Jalankan Aplikasi','control.php?act=run_app'],['t3','bi-lock-fill','Kunci Perangkat','#kunci'],['t4','bi-envelope-fill','Kirim Pesan','#pesan'],
++  ['t5','bi-arrow-clockwise','Restart Client','control.php?act=restart'],['t6','bi-power','Matikan Client','control.php?act=shutdown'],['t7','bi-calendar-week','Jadwal','schedules.php'],['t8','bi-file-earmark-text','Lihat Log','logs.php']] as $t) echo '<a class="tile '.$t[0].'" href="'.$t[3].'"><i class="bi '.$t[1].'"></i>'.$t[2].'</a>'; ?></div></div></div>
++ <div class="card mb-3" id="kunci"><div class="card-body"><div class="card-title"><i class="bi bi-lock-fill text-primary"></i> Kunci Perangkat</div><div class="sub mb-2">Mengunci layar client dan menampilkan pesan.</div>
++ <form method="post" action="control.php" onsubmit="return lockSubmit(this)"><?=$CF?><input type="hidden" name="back" value="index.php"><input type="hidden" name="action" value="lock">
++ <label class="form-label small fw-semibold">Target</label><select name="target" class="form-select form-select-sm mb-2"><?=$opts()?></select>
++ <label class="form-label small fw-semibold d-block">Jenis Kunci</label><label class="me-3 small"><input type="radio" class="form-check-input" name="ltype" value="now" checked> Kunci sekarang</label><label class="small"><input type="radio" class="form-check-input" name="ltype" value="sched"> Jadwal</label>
++ <label class="form-label small fw-semibold d-block mt-2">Pesan untuk client</label><textarea name="lock_msg" id="lockMsg" class="form-control" rows="3" maxlength="500">Ujian CBT akan segera dimulai. Mohon persiapkan diri dan jangan mengoperasikan komputer lain. Terima kasih.</textarea>
++ <label class="small mt-2 d-block"><input type="checkbox" class="form-check-input" checked disabled> Tampilkan tombol OK (wajib ditekan)</label>
++ <div class="d-flex gap-2 mt-2"><button class="btn btn-primary flex-fill"><i class="bi bi-send-fill"></i> Kirim Perintah</button><button type="button" class="btn btn-outline-primary flex-fill" onclick="preview()"><i class="bi bi-eye"></i> Lihat Pratinjau</button></div></form>
++ <div class="tip mt-3"><b class="text-primary"><i class="bi bi-info-circle-fill"></i> Contoh pesan yang sering digunakan</b><?php foreach($TPL as $t) echo '<div class="mt-1"><a href="#" class="text-reset" onclick="document.getElementById(\'lockMsg\').value=this.textContent;return false">'.h($t).'</a></div>'; ?></div></div></div>
++ <div class="card mb-3"><div class="card-body"><div class="d-flex justify-content-between align-items-start"><div><div class="card-title"><i class="bi bi-star text-primary"></i> Program Favorit</div><div class="sub">Program dan URL yang diizinkan.</div></div><a href="programs.php" class="btn btn-primary btn-sm"><i class="bi bi-plus"></i> Tambah</a></div>
++ <?php foreach($favs as $g): ?><form method="post" action="control.php" class="d-flex align-items-center gap-2 mt-2" onsubmit="return confirm('Jalankan <?=h($g['name'])?> di semua client online?')"><?=$CF?><input type="hidden" name="back" value="index.php"><input type="hidden" name="mode" value="all">
++ <?php if($g['type']==='url'): ?><input type="hidden" name="action" value="open_url"><input type="hidden" name="url" value="<?=h($g['path'])?>"><input type="hidden" name="browser" value="<?=h($g['parameter'])?>"><?php else: ?><input type="hidden" name="action" value="run_app"><input type="hidden" name="program" value="<?=$g['id']?>"><?php endif; ?>
++ <span class="fav-ic"><i class="bi <?=$g['type']==='url'?'bi-globe':'bi-window'?>"></i></span><div class="flex-fill text-truncate"><b class="d-block"><?=h($g['name'])?></b><small class="text-muted"><?=h($g['path'])?></small></div><button class="btn btn-primary btn-sm text-nowrap"><i class="bi bi-chevron-right"></i> Jalankan</button></form>
++ <?php endforeach; if(!$favs) echo '<div class="text-muted small mt-2">Belum ada program.</div>'; ?></div></div>
++ <div class="card"><div class="card-body"><div class="d-flex justify-content-between"><div class="card-title"><i class="bi bi-calendar3 text-primary"></i> Jadwal Hari Ini</div><a href="schedules.php" class="small">Lihat semua</a></div>
++ <?php foreach($today as $t){ $done=$t['last_run']===date('Y-m-d'); echo '<div class="d-flex align-items-center gap-3 border-bottom py-2"><b>'.h(substr($t['run_time'],0,5)).'</b><span class="flex-fill">'.h($t['name']).'</span><small class="text-muted">'.($t['mode']==='room'?h($t['room']):'Semua client').'</small><span class="badge-s '.($done?'b-ok':'b-wait').'">'.($done?'Selesai':'Menunggu').'</span></div>'; }
++ if(!$today) echo '<div class="text-muted small mt-2">Tidak ada jadwal hari ini.</div>'; ?></div></div>
++</div></div>
++<div class="modal fade" id="pv"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content" style="background:#0b1a3a;color:#fff"><div class="modal-body text-center p-5"><i class="bi bi-lock-fill display-3"></i><p class="fs-5 mt-3" id="pvText"></p><button class="btn btn-light px-5" data-bs-dismiss="modal">OK</button></div></div></div></div>
++<script>
++const chk=()=>[...document.querySelectorAll('.chk:checked')];
++document.getElementById('chkAll').onchange=e=>document.querySelectorAll('.chk').forEach(c=>c.checked=e.target.checked);
++function mass(a,l){const f=document.getElementById('massForm'),n=chk().length;f.action.value=a;f.mode.value=n?'pick':'all';
++ if(confirm(l+' '+(n?n+' client terpilih':'SEMUA client')+'?'))f.submit();}
++function rowAct(a,id,name){const f=document.getElementById('rowForm');if(!confirm('Kirim "'+a+'" ke '+name+'?'))return;f.action.value=a;f.target.value='pc:'+id;f.submit();}
++function pickTarget(id){document.getElementById('msgTarget').value='pc:'+id;}
++function preview(){document.getElementById('pvText').textContent=document.getElementById('lockMsg').value;new bootstrap.Modal(document.getElementById('pv')).show();}
++function lockSubmit(f){if(f.ltype.value==='sched'){location='schedules.php?act=lock';return false;}return confirm('Kunci layar pada target terpilih?');}
++// Ganti reload penuh: muat ulang hanya bila tidak ada interaksi (tidak ada centang / form terisi)
++setTimeout(function r(){if(!chk().length&&document.activeElement===document.body)location.reload();else setTimeout(r,30000)},30000);
++</script>
+ <?php page_footer();
+diff --git a/public/login.php b/public/login.php
+index 31fdc27..53376d0 100644
+--- a/public/login.php
++++ b/public/login.php
+@@ -11,7 +11,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
+   usleep(500000); $err='Username atau password salah.'; log_activity('Login gagal',substr($_POST['username']??'',0,50),'Gagal','','anon');
+ }
+ ?><!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Login - RCM</title>
+-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"></head>
++<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link href="assets/rcm.css" rel="stylesheet"></head>
+ <body style="background:#0b1f4d" class="d-flex align-items-center vh-100"><div class="card mx-auto shadow" style="width:360px"><div class="card-body p-4">
+ <h4 class="fw-bold">Remote Client Manager</h4><p class="text-muted">Masuk sebagai admin</p>
+ <?php if($err) echo '<div class="alert alert-danger py-2">'.h($err).'</div>'; ?>
+diff --git a/public/logs.php b/public/logs.php
+index 2653d2e..b8ce4a4 100644
+--- a/public/logs.php
++++ b/public/logs.php
+@@ -17,13 +17,13 @@ if(isset($_GET['csv'])){
+ $s=db()->prepare("SELECT COUNT(*) FROM activity_logs WHERE $W"); $s->execute($p); $n=(int)$s->fetchColumn(); $pages=max(1,(int)ceil($n/$per)); $pg=min($pg,$pages);
+ $s=db()->prepare("SELECT * FROM activity_logs WHERE $W ORDER BY id DESC LIMIT $per OFFSET ".(($pg-1)*$per)); $s->execute($p); $rows=$s->fetchAll();
+ $qs=fn($x)=>h(http_build_query(array_merge(['from'=>$from,'to'=>$to,'q'=>$q,'st'=>$st],$x)));
+-page_header('Riwayat & Log','logs'); ?>
++page_header('Riwayat & Log','logs','Semua aktivitas admin, jadwal, dan client.'); ?>
+ <div class="card"><div class="card-body"><form class="row g-2 mb-3"><div class="col-md-2"><input type="date" name="from" value="<?=h($from)?>" class="form-control"></div><div class="col-md-2"><input type="date" name="to" value="<?=h($to)?>" class="form-control"></div>
+ <div class="col-md-3"><input name="q" value="<?=h($q)?>" class="form-control" placeholder="Cari user, aksi, target, keterangan"></div>
+ <div class="col-md-2"><select name="st" class="form-select"><option value="">Semua status</option><option<?=$st==='Sukses'?' selected':''?>>Sukses</option><option<?=$st==='Gagal'?' selected':''?>>Gagal</option></select></div>
+ <div class="col-md-3 d-flex gap-2"><button class="btn btn-primary">Filter</button><a class="btn btn-outline-success" href="?<?=$qs(['csv'=>1])?>">Ekspor CSV</a></div></form>
+ <table class="table table-sm align-middle"><thead><tr><th>Waktu</th><th>User</th><th>Aksi</th><th>Target</th><th>Status</th><th>Keterangan</th></tr></thead><tbody>
+-<?php foreach($rows as $r) echo '<tr><td class="text-nowrap">'.h(date('d M H:i:s',strtotime($r['created_at']))).'</td><td>'.h($r['user']).'</td><td>'.h($r['action']).'</td><td>'.h($r['target']).'</td><td><span class="badge text-bg-'.($r['status']==='Sukses'?'success':'danger').'">'.h($r['status']).'</span></td><td class="text-muted small">'.h($r['note']).'</td></tr>';
++<?php foreach($rows as $r) echo '<tr><td class="text-nowrap">'.h(date('d M H:i:s',strtotime($r['created_at']))).'</td><td>'.h($r['user']).'</td><td>'.h($r['action']).'</td><td>'.h($r['target']).'</td><td><span class="badge-s '.($r['status']==='Sukses'?'b-ok':'b-fail').'">'.h($r['status']).'</span></td><td class="text-muted small">'.h($r['note']).'</td></tr>';
+ if(!$rows) echo '<tr><td colspan="6" class="text-center text-muted py-4">Tidak ada log.</td></tr>'; ?></tbody></table>
+ <div class="d-flex justify-content-between align-items-center"><small class="text-muted"><?=$n?> entri</small><ul class="pagination pagination-sm mb-0">
+ <?php foreach(array_unique([1,max(1,$pg-1),$pg,min($pages,$pg+1),$pages]) as $i) echo '<li class="page-item'.($i==$pg?' active':'').'"><a class="page-link" href="?'.$qs(['p'=>$i]).'">'.$i.'</a></li>'; ?></ul>
+diff --git a/public/programs.php b/public/programs.php
+index 39149e1..4ac631d 100644
+--- a/public/programs.php
++++ b/public/programs.php
+@@ -13,16 +13,19 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
+ }
+ $rows=db()->query('SELECT * FROM programs ORDER BY type,name')->fetchAll();
+ $btn=fn($act,$id,$cls,$lbl)=>'<form method="post" class="d-inline">'.csrf_field().'<input type="hidden" name="action" value="'.$act.'"><input type="hidden" name="id" value="'.$id.'"><button class="btn btn-sm btn-outline-'.$cls.'">'.$lbl.'</button></form>';
+-page_header('Program & Aplikasi','programs'); ?>
+-<div class="alert alert-info py-2">Hanya program berstatus <b>Diizinkan</b> yang bisa dijalankan dari menu Kontrol. Admin tidak bisa mengetik path bebas saat mengirim perintah.</div>
+-<div class="card mb-3"><div class="card-body"><table class="table align-middle"><thead><tr><th>Nama</th><th>Jenis</th><th>Path / URL</th><th>Parameter / Browser</th><th>Status</th><th></th></tr></thead><tbody>
+-<?php foreach($rows as $r): ?><tr><td class="fw-semibold"><?=h($r['name'])?></td><td><?=$r['type']==='url'?'URL':'Aplikasi'?></td><td class="small"><?=h($r['path'])?></td><td class="small"><?=h($r['parameter'])?></td>
+-<td><?=$r['allowed']?'<span class="badge text-bg-success">Diizinkan</span>':'<span class="badge text-bg-secondary">Nonaktif</span>'?></td><td class="text-nowrap"><?=$btn('toggle',$r['id'],'secondary',$r['allowed']?'Nonaktifkan':'Aktifkan')?> <?=$btn('del',$r['id'],'danger','<i class="bi bi-trash"></i>')?></td></tr>
+-<?php endforeach; ?></tbody></table></div></div>
+-<div class="card"><div class="card-body"><h5>Tambah program</h5><form method="post" class="row g-2"><?=csrf_field()?><input type="hidden" name="action" value="add">
++page_header('Kelola Program & Aplikasi','programs','Daftar aplikasi dan URL yang dapat dijalankan dari remote.'); $tab=($_GET['tab']??'app')==='url'?'url':'app'; ?>
++<div class="card mb-3"><div class="card-body"><div class="d-flex justify-content-between align-items-center mb-3">
++<ul class="nav nav-tabs border-0"><li class="nav-item"><a class="nav-link<?=$tab==='app'?' active':''?>" href="?tab=app">Aplikasi Windows</a></li><li class="nav-item"><a class="nav-link<?=$tab==='url'?' active':''?>" href="?tab=url">URL / Browser</a></li></ul>
++<a href="#tambah" class="btn btn-primary btn-sm"><i class="bi bi-plus"></i> Tambah <?=$tab==='url'?'URL':'Aplikasi'?></a></div>
++<div class="tip mb-3">Hanya program berstatus <b>Diizinkan</b> yang bisa dijalankan dari menu Remote Control. Admin tidak bisa mengetik path bebas saat mengirim perintah.</div>
++<table class="table align-middle"><thead><tr><th>No</th><th>Nama <?=$tab==='url'?'URL':'Aplikasi'?></th><th><?=$tab==='url'?'URL':'Path'?></th><th><?=$tab==='url'?'Browser':'Parameter'?></th><th>Status</th><th>Aksi</th></tr></thead><tbody>
++<?php $no=0; foreach($rows as $r): if($r['type']!==$tab) continue; $no++; ?><tr><td><?=$no?></td><td class="fw-semibold"><i class="bi <?=$tab==='url'?'bi-globe':'bi-window'?> text-primary me-1"></i><?=h($r['name'])?></td><td class="small"><?=h($r['path'])?></td><td class="small"><?=h($r['parameter']?:'-')?></td>
++<td><?=$r['allowed']?'<span class="badge-s b-ok">Diizinkan</span>':'<span class="badge-s b-idle">Nonaktif</span>'?></td><td class="text-nowrap"><?=$btn('toggle',$r['id'],'secondary',$r['allowed']?'Nonaktifkan':'Aktifkan')?> <?=$btn('del',$r['id'],'danger','<i class="bi bi-trash"></i>')?></td></tr>
++<?php endforeach; if(!$no) echo '<tr><td colspan="6" class="text-center text-muted py-4">Belum ada data.</td></tr>'; ?></tbody></table></div></div>
++<div class="card" id="tambah"><div class="card-body"><div class="card-title mb-2">Tambah program</div><form method="post" class="row g-2"><?=csrf_field()?><input type="hidden" name="action" value="add">
+ <div class="col-md-2"><input name="name" class="form-control" placeholder="Nama" required></div>
+-<div class="col-md-2"><select name="type" class="form-select"><option value="app">Aplikasi Windows</option><option value="url">URL / Browser</option></select></div>
++<div class="col-md-2"><select name="type" class="form-select"><option value="app"<?=$tab==='app'?' selected':''?>>Aplikasi Windows</option><option value="url"<?=$tab==='url'?' selected':''?>>URL / Browser</option></select></div>
+ <div class="col-md-4"><input name="path" class="form-control" placeholder="C:\Program Files\...\app.exe atau https://..." required></div>
+ <div class="col-md-2"><input name="parameter" class="form-control" placeholder="Argumen / chrome|edge"></div>
+-<div class="col-md-1 pt-2"><label><input type="checkbox" name="allowed" checked> Izinkan</label></div><div class="col-md-1"><button class="btn btn-primary w-100">Tambah</button></div></form></div></div>
++<div class="col-md-1 pt-2"><label><input class="form-check-input" type="checkbox" name="allowed" checked> Izinkan</label></div><div class="col-md-1"><button class="btn btn-primary w-100">Tambah</button></div></form></div></div>
+ <?php page_footer();
+diff --git a/public/scan.php b/public/scan.php
+index 67f37de..afcf584 100644
+--- a/public/scan.php
++++ b/public/scan.php
+@@ -31,7 +31,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
+   }
+ }
+ $job=(int)($_GET['job']??0);
+-page_header('Scan Jaringan','scan'); ?>
++page_header('Scan Jaringan','scan','Temukan komputer di jaringan lab dan daftarkan.'); ?>
+ <div class="card mb-3"><div class="card-body"><form method="post" class="row g-2 align-items-end"><?=csrf_field()?><input type="hidden" name="action" value="start">
+ <div class="col-md-4"><label class="form-label">Rentang IP (CIDR)</label><input name="cidr" class="form-control" value="192.168.1.0/24"></div>
+ <div class="col-auto"><button class="btn btn-primary"><i class="bi bi-wifi"></i> Mulai Scan</button></div></form>
+diff --git a/public/schedules.php b/public/schedules.php
+index 7a86e46..57bdac9 100644
+--- a/public/schedules.php
++++ b/public/schedules.php
+@@ -23,17 +23,18 @@ $apps=db()->query("SELECT id,name FROM programs WHERE type='app' AND allowed=1 O
+ $urls=db()->query("SELECT name,path FROM programs WHERE type='url' AND allowed=1")->fetchAll();
+ $rows=db()->query('SELECT s.*,r.name room FROM schedules s LEFT JOIN rooms r ON r.id=s.room_id ORDER BY s.run_time')->fetchAll();
+ $btn=fn($act,$id,$cls,$lbl)=>'<form method="post" class="d-inline">'.csrf_field().'<input type="hidden" name="action" value="'.$act.'"><input type="hidden" name="id" value="'.$id.'"><button class="btn btn-sm btn-outline-'.$cls.'">'.$lbl.'</button></form>';
+-page_header('Jadwal Otomatis','schedules'); ?>
+-<div class="alert alert-info py-2">Jadwal dijalankan oleh <code>cli/scheduler.php</code> (tiap menit, lihat README-FASE4). Terlambat sampai 5 menit tetap dijalankan, dan satu jadwal hanya sekali per hari.</div>
++page_header('Jadwal Otomatis','schedules','Atur waktu dan aksi yang dijalankan secara otomatis.'); $pre=isset(ACT[$_GET['act']??''])?$_GET['act']:''; ?>
++<div class="d-flex justify-content-end mb-2"><a href="#tambah" class="btn btn-primary btn-sm"><i class="bi bi-plus"></i> Tambah Jadwal</a></div>
++<div class="tip mb-3"><b class="text-primary"><i class="bi bi-info-circle-fill"></i> Catatan</b><br>Jadwal dijalankan oleh <code>cli/scheduler.php</code> (tiap menit, lihat README-FASE4). Terlambat sampai 5 menit tetap dijalankan, dan satu jadwal hanya sekali per hari.</div>
+ <div class="card mb-3"><div class="card-body"><table class="table align-middle"><thead><tr><th>Jam</th><th>Nama</th><th>Hari</th><th>Aksi</th><th>Target</th><th>Terakhir</th><th>Status</th><th></th></tr></thead><tbody>
+ <?php foreach($rows as $r): $d=array_map(fn($x)=>$DN[(int)$x],explode(',',$r['days'])); ?><tr class="<?=$r['active']?'':'text-muted'?>"><td class="fw-bold"><?=h(substr($r['run_time'],0,5))?></td><td><?=h($r['name'])?></td><td class="small"><?=h(implode(' ',$d))?></td><td><?=h(ACT[$r['action']]??$r['action'])?></td><td><?=$r['mode']==='room'?h($r['room']):'Semua'?></td>
+-<td class="small"><?=$r['last_run']?h($r['last_run']).'<br>'.h($r['last_result']):'-'?></td><td><?=$r['active']?'<span class="badge text-bg-success">Aktif</span>':'<span class="badge text-bg-secondary">Nonaktif</span>'?></td>
+-<td class="text-nowrap"><?=$btn('run',$r['id'],'primary','Jalankan')?> <?=$btn('toggle',$r['id'],'secondary',$r['active']?'Nonaktifkan':'Aktifkan')?> <?=$btn('del',$r['id'],'danger','<i class="bi bi-trash"></i>')?></td></tr>
++<td class="small"><?=$r['last_run']?h($r['last_run']).'<br>'.h($r['last_result']):'-'?></td><td><?=$r['active']?'<span class="badge-s b-ok">Aktif</span>':'<span class="badge-s b-fail">Nonaktif</span>'?></td>
++<td class="text-nowrap"><?=$btn('run',$r['id'],'primary','Jalankan')?> <form method="post" class="d-inline-block form-switch align-middle"><?=csrf_field()?><input type="hidden" name="action" value="toggle"><input type="hidden" name="id" value="<?=$r['id']?>"><input class="form-check-input" type="checkbox" role="switch" title="Aktif/nonaktif" onchange="this.form.submit()"<?=$r['active']?' checked':''?>></form> <?=$btn('del',$r['id'],'danger','<i class="bi bi-trash"></i>')?></td></tr>
+ <?php endforeach; if(!$rows) echo '<tr><td colspan="8" class="text-center text-muted py-4">Belum ada jadwal.</td></tr>'; ?></tbody></table></div></div>
+-<form method="post" class="card"><div class="card-body"><?=csrf_field()?><input type="hidden" name="action" value="add"><h5>Tambah jadwal</h5>
++<form method="post" class="card" id="tambah"><div class="card-body"><?=csrf_field()?><input type="hidden" name="action" value="add"><div class="card-title mb-2">Tambah jadwal</div>
+ <div class="row g-2 mb-2"><div class="col-md-4"><input name="name" class="form-control" placeholder="Nama jadwal, mis. Nyalakan semua client" required></div><div class="col-md-2"><input type="time" name="time" class="form-control" value="06:30" required></div>
+ <div class="col-md-6 pt-2"><?php foreach($DN as $k=>$v) echo '<label class="me-2"><input type="checkbox" name="days[]" value="'.$k.'"'.($k<=5?' checked':'').'> '.$v.'</label>'; ?></div></div>
+-<div class="row g-2 mb-2"><div class="col-md-4"><select name="sact" id="act" class="form-select"><?php foreach(ACT as $k=>$v) echo '<option value="'.$k.'">'.h($v).'</option>'; ?></select></div>
++<div class="row g-2 mb-2"><div class="col-md-4"><select name="sact" id="act" class="form-select"><?php foreach(ACT as $k=>$v) echo '<option value="'.$k.'"'.($k===$pre?' selected':'').'>'.h($v).'</option>'; ?></select></div>
+ <div class="col-md-3"><select name="mode" id="mode" class="form-select"><option value="all">Semua client</option><option value="room">Per ruang</option></select></div>
+ <div class="col-md-3"><select name="room" id="roomSel" class="form-select"><?php foreach($rooms as $r) echo '<option value="'.$r['id'].'">'.h($r['name']).'</option>'; ?></select></div></div>
+ <div class="g g-lock"><textarea name="lock_msg" class="form-control" rows="2" placeholder="Pesan layar kunci"></textarea></div>
+diff --git a/public/settings.php b/public/settings.php
+index f3d7d2a..c6d53d8 100644
+--- a/public/settings.php
++++ b/public/settings.php
+@@ -14,11 +14,11 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
+ $rooms=db()->query('SELECT * FROM rooms ORDER BY name')->fetchAll();
+ $rules=db()->query('SELECT r.*,m.name room FROM room_rules r JOIN rooms m ON m.id=r.room_id ORDER BY priority,id')->fetchAll();
+ $del=fn($act,$id,$lbl='<i class="bi bi-trash"></i>')=>'<form method="post" class="d-inline">'.csrf_field().'<input type="hidden" name="action" value="'.$act.'"><input type="hidden" name="id" value="'.$id.'"><button class="btn btn-sm btn-outline-danger">'.$lbl.'</button></form>';
+-page_header('Pengaturan','settings'); ?>
+-<div class="row g-3"><div class="col-lg-4"><div class="card"><div class="card-body"><h5>Ruang / Lab</h5>
++page_header('Pengaturan','settings','Ruang laboratorium dan aturan penempatan otomatis.'); ?>
++<div class="row g-3"><div class="col-lg-4"><div class="card"><div class="card-body"><div class="card-title mb-2">Ruang / Lab</div>
+ <?php foreach($rooms as $r) echo '<div class="d-flex justify-content-between mb-1"><span>'.h($r['name']).'</span>'.$del('room_del',$r['id']).'</div>'; ?>
+ <form method="post" class="d-flex gap-2 mt-3"><?=csrf_field()?><input type="hidden" name="action" value="room_add"><input name="name" class="form-control" placeholder="Lab 5"><button class="btn btn-primary">Tambah</button></form></div></div></div>
+-<div class="col-lg-8"><div class="card"><div class="card-body"><h5>Aturan ruang dari nama perangkat</h5><p class="text-muted small">Regex, tidak peka huruf besar/kecil. Prioritas lebih kecil dicek lebih dulu. Contoh: <code>^CBT-0[1-6]$</code> untuk CBT-01 s/d CBT-06.</p>
++<div class="col-lg-8"><div class="card"><div class="card-body"><div class="card-title mb-2">Aturan ruang dari nama perangkat</div><p class="text-muted small">Regex, tidak peka huruf besar/kecil. Prioritas lebih kecil dicek lebih dulu. Contoh: <code>^CBT-0[1-6]$</code> untuk CBT-01 s/d CBT-06.</p>
+ <table class="table table-sm align-middle"><thead><tr><th>Pola</th><th>Ruang</th><th>Prioritas</th><th></th></tr></thead><tbody>
+ <?php foreach($rules as $r) echo '<tr><td><code>'.h($r['pattern']).'</code></td><td>'.h($r['room']).'</td><td>'.$r['priority'].'</td><td>'.$del('rule_del',$r['id']).'</td></tr>'; ?></tbody></table>
+ <form method="post" class="row g-2"><?=csrf_field()?><input type="hidden" name="action" value="rule_add"><div class="col-md-5"><input name="pattern" class="form-control" placeholder="^LAB1[-_]" required></div>
+-- 
+2.39.5
+
